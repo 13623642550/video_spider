@@ -162,9 +162,9 @@ class mainFrame(wx.Frame):
 
         url = self.websiteUrl.GetValue().strip()
         if url:
-            url = url.split('\n')
+            urlList = url.split('\n')
             if self.webChoice.GetSelection() == 0:  # B站
-                BilibiliVideoSpider(urlList=url)
+                BilibiliVideoSpider(urlList=urlList)
             else:  # 其他网站
                 pass
         else:
@@ -263,7 +263,6 @@ class BilibiliVideoSpider(Thread):
             if response.status_code == 200:
                 return response.text
         except RequestException:
-            # printLogs('请求Html错误!!!')
             pub.sendMessage("update", type=SEND_LOG_INFO, message="请求Html错误!!!")
             app.Frame.donwloadButton.Enable(True)
 
@@ -301,7 +300,6 @@ class BilibiliVideoSpider(Thread):
             title = re.sub(r'[\/:*?"<>|]', '-', video['title'])  # 去掉创建文件时的非法字符
         url = video['video_url']
         filename = title + '.flv'
-        # printLogs(f'开始下载视频 -> {filename}')
         pub.sendMessage("update", type=SEND_LOG_INFO, message=f"开始下载视频 -> {filename}")
         savePath = getSavePath()
         if not os.path.exists(savePath):
@@ -309,7 +307,6 @@ class BilibiliVideoSpider(Thread):
         filePath = os.path.join(savePath, filename)
         with open(filePath, "wb") as f:
             f.write(requests.get(url=url, headers=self.downloadVideoHeaders, stream=True, verify=False).content)
-        # updateProgressBar()
         pub.sendMessage("update", type=SEND_PROGRESS_BAR_INFO)
         return filePath
 
@@ -324,7 +321,6 @@ class BilibiliVideoSpider(Thread):
             title = re.sub(r'[\/:*?"<>|]', '-', audio['title'])  # 去掉创建文件时的非法字符
         url = audio['audio_url']
         filename = title + '.mp3'
-        # printLogs(f'开始下载音频 -> {filename}')
         pub.sendMessage("update", type=SEND_LOG_INFO, message=f"开始下载音频 -> {filename}")
         savePath = getSavePath()
         if not os.path.exists(savePath):
@@ -332,7 +328,6 @@ class BilibiliVideoSpider(Thread):
         filePath = os.path.join(savePath, filename)
         with open(filePath, "wb") as f:
             f.write(requests.get(url=url, headers=self.downloadVideoHeaders, stream=True, verify=False).content)
-        # updateProgressBar()
         pub.sendMessage("update", type=SEND_PROGRESS_BAR_INFO)
         return filePath
 
@@ -344,7 +339,6 @@ class BilibiliVideoSpider(Thread):
         :param target:
         :return: 合成后的视频路径
         """
-        # printLogs('开始合并音、视频文件……')
         pub.sendMessage("update", type=SEND_LOG_INFO, message="开始合并音、视频文件……")
         video = VideoFileClip(videoFile)
         audio_clip = AudioFileClip(audioFile)
@@ -359,7 +353,6 @@ class BilibiliVideoSpider(Thread):
     def batchSpiderVideo(self):
         count = 1
         app.Frame.donwloadButton.Enable(False)
-        # printLogs("开始下载……")
         pub.sendMessage("update", type=SEND_LOG_INFO, message="开始下载B站视频……")
 
         app.Frame.progressBar.SetValue(0)
