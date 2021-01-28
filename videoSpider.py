@@ -17,12 +17,15 @@ from pyquery import PyQuery as pq
 from requests import RequestException
 
 APP_TITLE = u'视频下载器'
-WEB_List = ['B站']
+WEB_List = ['B站']  # 多个网站直接在后面添加元素
 
 # 消息发送的类型
 SEND_LOG_INFO = "logInfo"
 SEND_STATUS_INFO = "statusInfo"
 SEND_PROGRESS_BAR_INFO = "progressBarInfo"
+
+# 通用控件样式
+BTN_COLOUR = wx.Colour(0, 157, 255)
 
 
 class mainFrame(wx.Frame):
@@ -41,16 +44,15 @@ class mainFrame(wx.Frame):
         self.SetMaxSize(fixSize)
         self.SetMinSize(fixSize)
         self.Center()
-
         # 设置图标
         icon = wx.Icon('res/favicon.ico', wx.BITMAP_TYPE_ICO)
         self.SetIcon(icon)
 
         SMALL_FONT = wx.Font(10, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
         MIDDLE_FONT = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
+
         LEFT_MARGIN = 30
         HEIGHT_LINE1 = 10
-
         # 网站
         wx.StaticText(self, -1, u'网站：', pos=(LEFT_MARGIN, HEIGHT_LINE1), style=wx.ALIGN_RIGHT)
 
@@ -69,12 +71,12 @@ class mainFrame(wx.Frame):
         for eachRadio in [modeRadio1, modeRadio2]:
             self.Bind(wx.EVT_RADIOBUTTON, self.OnModeRadio, eachRadio)
         # 视频选集的需要提供选集的页码区间，比如：1-5，就是下载第1-5个选集视频
-        self.beginNum = wx.TextCtrl(self, -1, u'1', pos=(385, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
-        self.numLine = wx.StaticText(self, -1, '-', pos=(430, HEIGHT_LINE1), style=wx.ALIGN_CENTER)
-        self.endNum = wx.TextCtrl(self, -1, u'5', pos=(440, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
-        self.beginNum.Hide()
-        self.numLine.Hide()
-        self.endNum.Hide()
+        # self.beginNum = wx.TextCtrl(self, -1, u'1', pos=(385, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
+        # self.numLine = wx.StaticText(self, -1, '-', pos=(430, HEIGHT_LINE1), style=wx.ALIGN_CENTER)
+        # self.endNum = wx.TextCtrl(self, -1, u'5', pos=(440, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
+        # self.beginNum.Hide()
+        # self.numLine.Hide()
+        # self.endNum.Hide()
 
         # 保存目录
         HEIGHT_LINE2 = 45
@@ -92,7 +94,7 @@ class mainFrame(wx.Frame):
 
         # 开始下载按钮
         self.donwloadButton = wx.Button(self, -1, u'开 始\n下 载', pos=(440, HEIGHT_LINE3 + 20), size=(100, 100))
-        self.donwloadButton.SetBackgroundColour(wx.Colour(0, 157, 255))
+        self.donwloadButton.SetBackgroundColour(BTN_COLOUR)
         self.donwloadButton.SetFont(wx.Font(13, wx.ROMAN, wx.NORMAL, wx.BOLD))
         self.Bind(wx.EVT_BUTTON, self.OnDownloadButton, self.donwloadButton)
 
@@ -133,14 +135,20 @@ class mainFrame(wx.Frame):
         radioSelected = event.GetEventObject()
         text = radioSelected.GetLabel()
         updateStatusText(f'选择模式:{text}')
+        # if text == '视频选集':
+        #     self.beginNum.Show()
+        #     self.numLine.Show()
+        #     self.endNum.Show()
+        # else:
+        #     self.beginNum.Hide()
+        #     self.numLine.Hide()
+        #     self.endNum.Hide()
         if text == '视频选集':
-            self.beginNum.Show()
-            self.numLine.Show()
-            self.endNum.Show()
+            # 视频选集解析弹窗
+            self.videoListDialog = VideoListDialog(self, -1)
+            self.videoListDialog.ShowModal()
         else:
-            self.beginNum.Hide()
-            self.numLine.Hide()
-            self.endNum.Hide()
+            self.videoListDialog.Destroy()
 
     def onDirButton(self, event):
         """
@@ -164,7 +172,7 @@ class mainFrame(wx.Frame):
         if url:
             urlList = url.split('\n')
             if self.webChoice.GetSelection() == 0:  # B站
-                BilibiliVideoSpider(urlList=urlList)
+                VideoSpiderThread(urlList=urlList)
             else:  # 其他网站
                 pass
         else:
@@ -233,12 +241,91 @@ class mainApp(wx.App):
         return True
 
 
-class BilibiliVideoSpider(Thread):
+class VideoListDialog(wx.Dialog):
+
+    def __init__(self, parent, id):
+        webNo = app.Frame.webChoice.GetSelection()
+        super(VideoListDialog, self).__init__(parent, id, "视频选集解析-" + WEB_List[webNo], size=(400, 300))
+        panel = wx.Panel(self)
+        panel.SetBackgroundColour(wx.Colour(255, 255, 255))
+        self.webUrlTextCtrl = wx.TextCtrl(panel, -1, u'请在此输入网址', pos=(20, 10), size=(340, 20))
+        self.resultListTextCtrl = wx.TextCtrl(panel, -1, pos=(20, 40), size=(340, 160), style=wx.TE_MULTILINE)
+        self.parseWebUrlButton = wx.Button(panel, -1, u'解析网址', pos=(100, 210), size=(70, 30))
+        self.parseWebUrlButton.SetBackgroundColour(BTN_COLOUR)
+        self.autoWriteUrlListButton = wx.Button(panel, -1, u'一键填入', pos=(210, 210), size=(70, 30))
+        self.autoWriteUrlListButton.SetBackgroundColour(BTN_COLOUR)
+        self.Bind(wx.EVT_BUTTON, self.OnParseWebUrl, self.parseWebUrlButton)
+        self.Bind(wx.EVT_BUTTON, self.OnAutoWriteUrlList, self.autoWriteUrlListButton)
+
+    def OnParseWebUrl(self, event):
+        """
+        解析网址
+        :param event:
+        :return:
+        """
+        url = self.webUrlTextCtrl.GetValue().strip()
+        if (not url) or not (str(url).startswith('http://') or str(url).startswith('https://')):
+            wx.LogWarning("请填入正确的网址")
+        else:
+            self.resultListTextCtrl.SetLabelText('')
+            try:
+                if app.Frame.webChoice.GetSelection() == 0:  # B站
+                    bSpider = BilibiliVideoSpider()
+                    self.videoUrlList = bSpider.parseHtml(bSpider.getHtml(url))['video_url_list']
+                    if self.videoUrlList:
+                        for videoUrl in self.videoUrlList:
+                            # self.resultListTextCtrl.AppendText(videoUrl['title'] + ': ' + videoUrl['url'] + '\n')
+                            self.resultListTextCtrl.AppendText(videoUrl['url'] + '\n')
+                else:
+                    wx.MessageBox("获取其他网站视频选集")
+            except Exception as e:
+                self.resultListTextCtrl.SetLabelText('无法解析该网址！')
+
+    def OnAutoWriteUrlList(self, event):
+        """
+        将解析后的网址填入主面板地址栏中
+        :param event:
+        :return:
+        """
+        urlList = self.resultListTextCtrl.GetValue().strip()
+        if not urlList or urlList == '无法解析该网址！':
+            wx.LogWarning('暂无可填入的网址')
+        else:
+            app.Frame.websiteUrl.SetLabelText(urlList)
+            self.Close()
+        # if self.videoUrlList:
+        #     self.resultListTextCtrl.SetLabelText('')
+        #     for videoUrl in self.videoUrlList:
+        #         app.Frame.websiteUrl.AppendText(videoUrl['url'] + '\n')
+        #         self.videoUrlList = ''
+        #         self.Close()
+        # else:
+        #     wx.LogWarning('暂无可填入的网址')
+
+
+class VideoSpiderThread(Thread):
+    """
+    多线程爬取视频，根据选择的不同网站执行不同的爬取方法
+    """
+
+    def __init__(self, urlList):
+        Thread.__init__(self)
+        self.urlList = urlList
+        self.start()
+
+    def run(self):
+        if app.Frame.webChoice.GetSelection() == 0:  # B站
+            BilibiliVideoSpider(urlList=self.urlList).batchSpiderVideo()
+        else:  # 其他网站
+            pass
+
+
+class BilibiliVideoSpider():
     """
     B站视频爬虫
     """
 
-    def __init__(self, urlList):
+    def __init__(self, urlList=None):
         self.getHtmlHeaders = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -252,9 +339,6 @@ class BilibiliVideoSpider(Thread):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
         }
         self.urlList = urlList
-
-        Thread.__init__(self)
-        self.start()
 
     # 一般这里得到的网页源码和F12查看看到的不一样，因为F12开发者工具里的源码经过了浏览器的解释
     def getHtml(self, url):
@@ -283,10 +367,20 @@ class BilibiliVideoSpider(Thread):
             if 'baseUrl' in item.keys():
                 audio_url = item['baseUrl']
 
+        # 获取视频选集列表
+        initial_pattern = r'\<script\>window\.__INITIAL_STATE__=(.*?)\;\(function\(\)'
+        initial_res = re.findall(initial_pattern, html)[0]
+        initial_temp = json.loads(initial_res)
+        url_prefix = 'https://www.bilibili.com/video/' + initial_temp['videoData']['bvid'] + '?p='
+        video_url_list = []
+        for item in initial_temp['videoData']['pages']:
+            video_url_list.append({'title': str(item['part']), 'url': url_prefix + str(item['page'])})
+
         return {
             'title': video_title,
             'video_url': video_url,
-            'audio_url': audio_url
+            'audio_url': audio_url,
+            'video_url_list': video_url_list
         }
 
     def downloadVideo(self, video, title=None):
@@ -350,25 +444,35 @@ class BilibiliVideoSpider(Thread):
         os.remove(videoFile)
         os.remove(audioFile)
 
+    def spiderVideo(self, url, title):
+        """
+        爬取视频
+        :param url:     视频网址
+        :param title:   保存的视频名称
+        :return:
+        """
+        html = self.parseHtml(self.getHtml(url))
+        videoPath = self.downloadVideo(html, title)
+        audioPath = self.downloadAudio(html, title)
+        self.composeVideoAudio(videoPath, audioPath)
+
     def batchSpiderVideo(self):
+        """
+        批量爬取视频
+        :return:
+        """
         count = 1
         app.Frame.donwloadButton.Enable(False)
         pub.sendMessage("update", type=SEND_LOG_INFO, message="开始下载B站视频……")
 
         app.Frame.progressBar.SetValue(0)
         app.Frame.progressBar.SetRange(len(self.urlList) * 3)  # 每个视频下载分为3步，所以总区间设置为视频数*步数
-        for ur in self.urlList:
-            html = self.parseHtml(self.getHtml(ur))
-            videoPath = self.downloadVideo(html, str(count))
-            audioPath = self.downloadAudio(html, str(count))
-            self.composeVideoAudio(videoPath, audioPath)
+        for url in self.urlList:
+            self.spiderVideo(url, str(count))
             pub.sendMessage("update", type=SEND_STATUS_INFO, message=(str(count) + '个视频下载完成！'))
             count += 1
         pub.sendMessage("update", type=SEND_PROGRESS_BAR_INFO, message=len(self.urlList) * 3)
         app.Frame.donwloadButton.Enable(True)
-
-    def run(self):
-        self.batchSpiderVideo()
 
 
 if __name__ == "__main__":
