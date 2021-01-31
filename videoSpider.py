@@ -45,11 +45,11 @@ class mainFrame(wx.Frame):
         self.SetMinSize(fixSize)
         self.Center()
         # 设置图标
-        icon = wx.Icon('res/favicon.ico', wx.BITMAP_TYPE_ICO)
+        icon = wx.Icon('favicon.ico', wx.BITMAP_TYPE_ICO)
         self.SetIcon(icon)
 
         SMALL_FONT = wx.Font(10, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
-        MIDDLE_FONT = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
+        # MIDDLE_FONT = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
 
         LEFT_MARGIN = 30
         HEIGHT_LINE1 = 10
@@ -70,13 +70,6 @@ class mainFrame(wx.Frame):
         modeRadio2 = wx.RadioButton(self, -1, u'视频选集', pos=(LEFT_MARGIN + 280, HEIGHT_LINE1))
         for eachRadio in [modeRadio1, modeRadio2]:
             self.Bind(wx.EVT_RADIOBUTTON, self.OnModeRadio, eachRadio)
-        # 视频选集的需要提供选集的页码区间，比如：1-5，就是下载第1-5个选集视频
-        # self.beginNum = wx.TextCtrl(self, -1, u'1', pos=(385, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
-        # self.numLine = wx.StaticText(self, -1, '-', pos=(430, HEIGHT_LINE1), style=wx.ALIGN_CENTER)
-        # self.endNum = wx.TextCtrl(self, -1, u'5', pos=(440, HEIGHT_LINE1), size=(40, 20), style=wx.TE_CENTER)
-        # self.beginNum.Hide()
-        # self.numLine.Hide()
-        # self.endNum.Hide()
 
         # 保存目录
         HEIGHT_LINE2 = 45
@@ -135,14 +128,6 @@ class mainFrame(wx.Frame):
         radioSelected = event.GetEventObject()
         text = radioSelected.GetLabel()
         updateStatusText(f'选择模式:{text}')
-        # if text == '视频选集':
-        #     self.beginNum.Show()
-        #     self.numLine.Show()
-        #     self.endNum.Show()
-        # else:
-        #     self.beginNum.Hide()
-        #     self.numLine.Hide()
-        #     self.endNum.Hide()
         if text == '视频选集':
             # 视频选集解析弹窗
             self.videoListDialog = VideoListDialog(self, -1)
@@ -383,15 +368,16 @@ class BilibiliVideoSpider():
             'video_url_list': video_url_list
         }
 
-    def downloadVideo(self, video, title=None):
+    def downloadVideo(self, video, titleSuffix=None):
         """
         下载视频
         :param video:
         :param title:
         :return:
         """
-        if not title:
-            title = re.sub(r'[\/:*?"<>|]', '-', video['title'])  # 去掉创建文件时的非法字符
+        title = re.sub(r'[\/:*?"<>|]', '-', video['title'])  # 去掉创建文件时的非法字符
+        if titleSuffix:
+            title += titleSuffix
         url = video['video_url']
         filename = title + '.flv'
         pub.sendMessage("update", type=SEND_LOG_INFO, message=f"开始下载视频 -> {filename}")
@@ -404,15 +390,16 @@ class BilibiliVideoSpider():
         pub.sendMessage("update", type=SEND_PROGRESS_BAR_INFO)
         return filePath
 
-    def downloadAudio(self, audio, title=None):
+    def downloadAudio(self, audio, titleSuffix=None):
         """
         下载音频
         :param audio:
         :param title:
         :return:
         """
-        if not title:
-            title = re.sub(r'[\/:*?"<>|]', '-', audio['title'])  # 去掉创建文件时的非法字符
+        title = re.sub(r'[\/:*?"<>|]', '-', audio['title'])  # 去掉创建文件时的非法字符
+        if titleSuffix:
+            title += titleSuffix
         url = audio['audio_url']
         filename = title + '.mp3'
         pub.sendMessage("update", type=SEND_LOG_INFO, message=f"开始下载音频 -> {filename}")
@@ -444,7 +431,7 @@ class BilibiliVideoSpider():
         os.remove(videoFile)
         os.remove(audioFile)
 
-    def spiderVideo(self, url, title):
+    def spiderVideo(self, url, titleSuffix=None):
         """
         爬取视频
         :param url:     视频网址
@@ -452,8 +439,8 @@ class BilibiliVideoSpider():
         :return:
         """
         html = self.parseHtml(self.getHtml(url))
-        videoPath = self.downloadVideo(html, title)
-        audioPath = self.downloadAudio(html, title)
+        videoPath = self.downloadVideo(html, titleSuffix)
+        audioPath = self.downloadAudio(html, titleSuffix)
         self.composeVideoAudio(videoPath, audioPath)
 
     def batchSpiderVideo(self):
@@ -468,7 +455,10 @@ class BilibiliVideoSpider():
         app.Frame.progressBar.SetValue(0)
         app.Frame.progressBar.SetRange(len(self.urlList) * 3)  # 每个视频下载分为3步，所以总区间设置为视频数*步数
         for url in self.urlList:
-            self.spiderVideo(url, str(count))
+            if len(self.urlList) == 1:
+                self.spiderVideo(url)
+            else:
+                self.spiderVideo(url, ' - ' + str(count))
             pub.sendMessage("update", type=SEND_STATUS_INFO, message=(str(count) + '个视频下载完成！'))
             count += 1
         pub.sendMessage("update", type=SEND_PROGRESS_BAR_INFO, message=len(self.urlList) * 3)
