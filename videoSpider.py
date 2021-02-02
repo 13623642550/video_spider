@@ -16,8 +16,17 @@ from pubsub import pub
 from pyquery import PyQuery as pq
 from requests import RequestException
 
+# 窗口标题
 APP_TITLE = u'视频下载器'
-WEB_List = ['B站']  # 多个网站直接在后面添加元素
+
+# 多个网站直接在后面添加元素
+WEB_List = ['B站']
+
+# 视频清晰度
+QUALITY = {
+    "accept_description": ["高清 1080P", "高清 720P", "清晰 480P", "流畅 360P"],
+    "accept_quality": [80, 64, 32, 16]
+}
 
 # 消息发送的类型
 SEND_LOG_INFO = "logInfo"
@@ -62,7 +71,6 @@ class mainFrame(wx.Frame):
         self.webChoice.SetFont(SMALL_FONT)
         # 添加事件处理
         self.Bind(wx.EVT_CHOICE, self.OnWebChoice, self.webChoice)
-        # print(self.webChoice.GetSelection())
 
         # 模式
         wx.StaticText(self, -1, u'模式：', pos=(LEFT_MARGIN + 180, HEIGHT_LINE1), style=wx.ALIGN_RIGHT)
@@ -70,6 +78,17 @@ class mainFrame(wx.Frame):
         modeRadio2 = wx.RadioButton(self, -1, u'视频选集', pos=(LEFT_MARGIN + 280, HEIGHT_LINE1))
         for eachRadio in [modeRadio1, modeRadio2]:
             self.Bind(wx.EVT_RADIOBUTTON, self.OnModeRadio, eachRadio)
+
+        # 清晰度
+        wx.StaticText(self, -1, u'清晰度：', pos=(LEFT_MARGIN + 390, HEIGHT_LINE1), style=wx.ALIGN_RIGHT)
+
+        self.quanlityChoice = wx.Choice(self, -1, pos=(LEFT_MARGIN + 440, HEIGHT_LINE1), size=(70, 20),
+                                        choices=QUALITY['accept_description'],
+                                        style=wx.ALIGN_CENTER_VERTICAL)
+        self.quanlityChoice.SetSelection(0)
+        self.quanlityChoice.SetFont(SMALL_FONT)
+        # 添加事件处理
+        self.Bind(wx.EVT_CHOICE, self.OnQualityChoice, self.quanlityChoice)
 
         # 保存目录
         HEIGHT_LINE2 = 45
@@ -134,6 +153,15 @@ class mainFrame(wx.Frame):
             self.videoListDialog.ShowModal()
         else:
             self.videoListDialog.Destroy()
+
+    def OnQualityChoice(self, event):
+        """
+        视频清晰度选择事件
+        :param event: 
+        :return: 
+        """
+        updateStatusText('选择视频清晰度：' + event.GetString())
+        # print(event.GetSelection())
 
     def onDirButton(self, event):
         """
@@ -305,7 +333,7 @@ class VideoSpiderThread(Thread):
             pass
 
 
-class BilibiliVideoSpider():
+class BilibiliVideoSpider:
     """
     B站视频爬虫
     """
@@ -345,8 +373,11 @@ class BilibiliVideoSpider():
         result = re.findall(pattern, html)[0]
         temp = json.loads(result)
         for item in temp['data']['dash']['video']:
-            if 'baseUrl' in item.keys():
-                video_url = item['baseUrl']
+            # 根据不同的清晰度选择不同的下载网址
+            selectedQuality = QUALITY['accept_quality'][app.Frame.quanlityChoice.GetSelection()]
+            if selectedQuality == item['id']:
+                if 'baseUrl' in item.keys():
+                    video_url = item['baseUrl']
 
         for item in temp['data']['dash']['audio']:
             if 'baseUrl' in item.keys():
