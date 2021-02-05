@@ -22,6 +22,9 @@ APP_TITLE = u'视频下载器'
 # 多个网站直接在后面添加元素
 WEB_List = ['B站']
 
+# 下载模式
+VIDEO_MODE = ['单视频', '视频选集']
+
 # 视频清晰度
 QUALITY = {
     "accept_description": ["高清 1080P", "高清 720P", "清晰 480P", "流畅 360P"],
@@ -73,10 +76,12 @@ class mainFrame(wx.Frame):
         self.Bind(wx.EVT_CHOICE, self.OnWebChoice, self.webChoice)
 
         # 模式
+        self.videoMode = VIDEO_MODE[0]  # 0代表单视频，1代表多视频
         wx.StaticText(self, -1, u'模式：', pos=(LEFT_MARGIN + 180, HEIGHT_LINE1), style=wx.ALIGN_RIGHT)
-        modeRadio1 = wx.RadioButton(self, -1, u'单视频', pos=(LEFT_MARGIN + 220, HEIGHT_LINE1), style=wx.RB_GROUP)
-        modeRadio2 = wx.RadioButton(self, -1, u'视频选集', pos=(LEFT_MARGIN + 280, HEIGHT_LINE1))
-        for eachRadio in [modeRadio1, modeRadio2]:
+        self.modeRadio1 = wx.RadioButton(self, -1, VIDEO_MODE[0], pos=(LEFT_MARGIN + 220, HEIGHT_LINE1),
+                                         style=wx.RB_GROUP)
+        self.modeRadio2 = wx.RadioButton(self, -1, VIDEO_MODE[1], pos=(LEFT_MARGIN + 280, HEIGHT_LINE1))
+        for eachRadio in [self.modeRadio1, self.modeRadio2]:
             self.Bind(wx.EVT_RADIOBUTTON, self.OnModeRadio, eachRadio)
 
         # 清晰度
@@ -147,18 +152,20 @@ class mainFrame(wx.Frame):
         radioSelected = event.GetEventObject()
         text = radioSelected.GetLabel()
         updateStatusText(f'选择模式:{text}')
-        if text == '视频选集':
+        if text == VIDEO_MODE[1]:
             # 视频选集解析弹窗
             self.videoListDialog = VideoListDialog(self, -1)
             self.videoListDialog.ShowModal()
+            self.videoMode = VIDEO_MODE[1]
         else:
             self.videoListDialog.Destroy()
+            self.videoMode = VIDEO_MODE[0]
 
     def OnQualityChoice(self, event):
         """
         视频清晰度选择事件
-        :param event: 
-        :return: 
+        :param event:
+        :return:
         """
         updateStatusText('选择视频清晰度：' + event.GetString())
         # print(event.GetSelection())
@@ -486,7 +493,7 @@ class BilibiliVideoSpider:
         app.Frame.progressBar.SetValue(0)
         app.Frame.progressBar.SetRange(len(self.urlList) * 3)  # 每个视频下载分为3步，所以总区间设置为视频数*步数
         for url in self.urlList:
-            if len(self.urlList) == 1:
+            if len(self.urlList) == 1 or app.Frame.videoMode == VIDEO_MODE[0]:
                 self.spiderVideo(url)
             else:
                 self.spiderVideo(url, ' - ' + str(count))
