@@ -29,7 +29,7 @@ pip install pyinstaller
 
 3. 打包那个文件结构如下：
 
-   ![](D:\Python\Projects\video_spider\images\3.png)
+   ![](images/3.png)
 
    如果打包报错，参考如下文章：
 
