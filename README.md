@@ -1,5 +1,5 @@
 # video_spider
-> Python编写的视频爬虫桌面GUI程序，可以将代码导入开发工具运行，也可以双击dist/videoSpider目录中的videoSpider.exe直接运行。
+> Python编写的视频爬虫桌面GUI程序，可以将代码导入开发工具运行，也可以在执行打包完成后，双击dist/videoSpider目录中的videoSpider.exe直接运行。
 
 ### 将项目打包成exe文件
 1. 安装pyinstaller
